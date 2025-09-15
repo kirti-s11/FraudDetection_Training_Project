@@ -132,3 +132,6 @@ logs/
 
 # Kaggle
 .kaggle/
+
+scripts/quick_train.py
+test_api.py

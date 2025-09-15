@@ -8,6 +8,7 @@ from pathlib import Path
 from src.utils.logger import setup_logger
 from src.utils.exceptions import FeatureEngineeringError
 from src.config import MODEL_CONFIG, ARTIFACTS_DIR
+import re
 
 logger = setup_logger(__name__)
 
@@ -55,20 +56,30 @@ class FeatureEngineer:
     def encode_categorical_features(self, df: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
         try:
             df_copy = df.copy()
-            
+
             for col in self.categorical_columns:
                 if col in df_copy.columns:
+                    values = df_copy[col].astype(str).fillna('Missing')
                     if fit:
                         if col not in self.label_encoders:
                             self.label_encoders[col] = LabelEncoder()
-                        df_copy[col] = self.label_encoders[col].fit_transform(df_copy[col].astype(str))
+                        # Fit on observed values + a reserved 'Unknown' class
+                        unique_vals = pd.Index(values.unique()).tolist()
+                        if 'Unknown' not in unique_vals:
+                            unique_vals.append('Unknown')
+                        self.label_encoders[col].fit(unique_vals)
+                        # Transform current values
+                        df_copy[col] = self.label_encoders[col].transform(values)
                     else:
                         if col in self.label_encoders:
-                            df_copy[col] = self.label_encoders[col].transform(df_copy[col].astype(str))
-            
+                            le = self.label_encoders[col]
+                            # Map unseen to 'Unknown' before transform
+                            known = set(le.classes_)
+                            mapped = values.where(values.isin(known), other='Unknown')
+                            df_copy[col] = le.transform(mapped)
             self.logger.info("Categorical features encoded successfully")
             return df_copy
-            
+
         except Exception as e:
             self.logger.error(f"Failed to encode categorical features: {str(e)}")
             raise FeatureEngineeringError(f"Failed to encode categorical features: {str(e)}")
@@ -129,14 +140,16 @@ class FeatureEngineer:
         try:
             self.logger.info("Starting feature engineering...")
             
-            train_processed = self.create_ratio_features(train_df)
+            train_processed = self.convert_tenure_columns(train_df)
+            train_processed = self.create_ratio_features(train_processed)
             train_processed = self.create_interaction_features(train_processed)
             train_processed = self.encode_categorical_features(train_processed, fit=fit)
             train_processed = self.handle_outliers(train_processed)
             train_processed = self.scale_features(train_processed, fit=fit)
             
             if test_df is not None:
-                test_processed = self.create_ratio_features(test_df)
+                test_processed = self.convert_tenure_columns(test_df)
+                test_processed = self.create_ratio_features(test_processed)
                 test_processed = self.create_interaction_features(test_processed)
                 test_processed = self.encode_categorical_features(test_processed, fit=False)
                 test_processed = self.handle_outliers(test_processed)
@@ -215,14 +228,17 @@ class FeatureEngineer:
             # First, ensure we have the same preprocessing as training data
             from src.data.preprocessing import DataPreprocessor
             preprocessor = DataPreprocessor()
-            processed_df = preprocessor.handle_missing_values(df)
-            
+            # Parse dates first to convert strings to numeric epoch days
+            processed_df = preprocessor.parse_dates(df)
+            processed_df = preprocessor.handle_missing_values(processed_df)
+
+            processed_df = self.convert_tenure_columns(processed_df)
             processed_df = self.create_ratio_features(processed_df)
             processed_df = self.create_interaction_features(processed_df)
             processed_df = self.encode_categorical_features(processed_df, fit=False)
             processed_df = self.handle_outliers(processed_df)
             processed_df = self.scale_features(processed_df, fit=False)
-            
+
             if self.feature_names:
                 # Ensure all expected features are present
                 missing_features = set(self.feature_names) - set(processed_df.columns)
@@ -235,3 +251,22 @@ class FeatureEngineer:
         except Exception as e:
             self.logger.error(f"Failed to transform new data: {str(e)}")
             raise FeatureEngineeringError(f"Failed to transform new data: {str(e)}")
+
+    def _tenure_to_months(self, val) -> int:
+        if pd.isna(val):
+            return 0
+        s = str(val).lower().strip()
+        yrs = 0
+        mons = 0
+        y = re.search(r'(\d+)\s*yrs?', s)
+        m = re.search(r'(\d+)\s*mon', s)
+        if y: yrs = int(y.group(1))
+        if m: mons = int(m.group(1))
+        return int(yrs * 12 + mons)
+
+    def convert_tenure_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_copy = df.copy()
+        for col in ['AVERAGE_ACCT_AGE', 'CREDIT_HISTORY_LENGTH']:
+            if col in df_copy.columns:
+                df_copy[col] = df_copy[col].apply(self._tenure_to_months)
+        return df_copy
