@@ -1,6 +1,6 @@
 # Fraud Detection ML Pipeline
 
-A robust end-to-end machine learning pipeline for vehicle loan default prediction with Streamlit frontend and FastAPI backend.
+An end-to-end machine learning pipeline for vehicle loan default prediction with Streamlit frontend and FastAPI backend.
 
 ## Features
 
@@ -42,18 +42,6 @@ A robust end-to-end machine learning pipeline for vehicle loan default predictio
 └── data/                         # Data storage
 ```
 
-## Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd FraudDetection_Training_Project
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
 
 ## Usage
 
@@ -195,11 +183,3 @@ The system saves:
 - Streamlit
 - XGBoost, CatBoost, LightGBM
 - Kaggle Hub for data access
-
-## Notes
-
-- The system automatically downloads the dataset on first run
-- Models are trained with optimized hyperparameters
-- Feature engineering includes outlier handling and scaling
-- The web interface provides an intuitive prediction experience
-- All components are modular and can be used independently
