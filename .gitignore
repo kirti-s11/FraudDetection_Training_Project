@@ -125,10 +125,10 @@ Thumbs.db
 # models/
 artifacts/
 logs/
-*.joblib
-*.pkl
-*.csv
-*.json
+# *.joblib
+# *.pkl
+# *.csv
+# *.json
 
 # Kaggle
 .kaggle/
