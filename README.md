@@ -2,6 +2,10 @@
 
 An end-to-end machine learning pipeline for vehicle loan default prediction with Streamlit frontend and FastAPI backend.
 
+~~ Not all files were merged from previous session, ingestion, preprocessing are missing, so are models under artifacts.... ~~
+
+Except from the artifacts, most were merged.....
+
 ## Features
 
 - **Data Ingestion**: Automated data downloading from Kaggle
